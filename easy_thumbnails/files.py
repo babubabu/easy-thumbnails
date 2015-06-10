@@ -417,7 +417,9 @@ class Thumbnailer(File):
                     break
                 frame_index += 1
         else:
-            images = [self.generate_source_image(thumbnail_options)]
+            images = [engine.generate_source_image(
+            self, thumbnail_options, self.source_generators,
+            fail_silently=silent_template_exception)]
 
         thumbnail_images = []
         for image in images:
