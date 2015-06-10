@@ -463,7 +463,6 @@ class Thumbnailer(File):
                     image.sequence.append(WandImage(blob=thumbnail_image_stream))
 
                 for index, single_image in enumerate(image.sequence):
-                    print index
                     with single_image:
                         single_image.delay = original_gif.sequence[index].delay
 
