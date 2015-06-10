@@ -1,5 +1,7 @@
 import os
 from django.utils import six
+import six
+import StringIO
 
 from django.core.files.base import File, ContentFile
 from django.core.files.storage import (
@@ -15,6 +17,11 @@ from easy_thumbnails import engine, exceptions, models, utils, signals, storage
 from easy_thumbnails.alias import aliases
 from easy_thumbnails.conf import settings
 from easy_thumbnails.options import ThumbnailOptions
+
+try:
+    from PIL import Image
+except ImportError:
+    import Image
 
 
 def get_thumbnailer(obj, relative_name=None):
@@ -384,8 +391,44 @@ class Thumbnailer(File):
             raise exceptions.InvalidImageFormatError(
                 "The source file does not appear to be an image")
 
-        thumbnail_image = engine.process_image(image, thumbnail_options,
-                                               self.thumbnail_processors)
+        self.open()
+        source_image = Image.open(self.file)
+        is_animated_gif = self.name.lower().endswith('.gif') \
+            and source_image.format == 'GIF' \
+            and source_image.info.get('duration') != None
+        if is_animated_gif:
+            frame_index = 0
+            images = []
+            durations = []
+            base_image = source_image.convert("RGBA")
+            palette = source_image.getpalette()
+            while True:
+                try:
+                    source_image.seek(frame_index)
+                    if palette == source_image.getpalette():
+                        source_image.putpalette(palette)
+                    rgba_gif_image = source_image.convert("RGBA")
+                    base_image.paste(rgba_gif_image, (0,0), rgba_gif_image)
+                    durations.append(source_image.info['duration'] / 1000.0)
+                    images.append(base_image.copy())
+                except:
+                    break
+                frame_index += 1
+        else:
+            images = [self.generate_source_image(thumbnail_options)]
+
+        thumbnail_images = []
+        for image in images:
+            if image is None:
+                raise exceptions.InvalidImageFormatError(
+                    "The source file does not appear to be an image")
+            thumb = engine.process_image(image, thumbnail_options, self.thumbnail_processors)
+            thumbnail_images.append(thumb)
+        
+        thumbnail_image = thumbnail_images[0]
+
+        quality = thumbnail_options.get('quality', self.thumbnail_quality)
+
         if high_resolution:
             thumbnail_options['size'] = orig_size  # restore original size
 
@@ -396,10 +439,18 @@ class Thumbnailer(File):
         quality = thumbnail_options['quality']
         subsampling = thumbnail_options['subsampling']
 
-        img = engine.save_image(
-            thumbnail_image, filename=filename, quality=quality,
-            subsampling=subsampling)
-        data = img.read()
+        if is_animated_gif:
+            from easy_thumbnails.utils import images2gif
+            thumbnail_io = StringIO.StringIO()
+            images2gif.writeGif(thumbnail_io, thumbnail_images, duration=durations)
+            thumbnail_io.flush()
+            data = thumbnail_io.getvalue()
+            thumbnail_io.close()
+            self.close()
+        else:
+            img = engine.save_image(
+                thumbnail_image, filename=filename, quality=quality)
+            data = img.read()
 
         thumbnail = ThumbnailFile(
             filename, file=ContentFile(data), storage=self.thumbnail_storage,
