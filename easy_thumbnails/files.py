@@ -23,6 +23,8 @@ try:
 except ImportError:
     import Image
 
+import subprocess
+
 
 def get_thumbnailer(obj, relative_name=None):
     """
@@ -424,7 +426,7 @@ class Thumbnailer(File):
                     "The source file does not appear to be an image")
             thumb = engine.process_image(image, thumbnail_options, self.thumbnail_processors)
             thumbnail_images.append(thumb)
-        
+
         thumbnail_image = thumbnail_images[0]
 
         quality = thumbnail_options.get('quality', self.thumbnail_quality)
@@ -440,13 +442,36 @@ class Thumbnailer(File):
         subsampling = thumbnail_options['subsampling']
 
         if is_animated_gif:
-            from easy_thumbnails.utils import images2gif
-            thumbnail_io = StringIO.StringIO()
-            images2gif.writeGif(thumbnail_io, thumbnail_images, duration=durations)
-            thumbnail_io.flush()
-            data = thumbnail_io.getvalue()
-            thumbnail_io.close()
-            self.close()
+            width, height = thumbnail_images[0].size
+
+            from wand.image import Image as WandImage
+            from wand.sequence import SingleImage as WandSingleImage
+
+            import pdb
+            self.file.seek(0)
+            original_gif = WandImage(file=self.file)
+
+            from io import BytesIO
+            animated_gif_stream = BytesIO()
+            with WandImage(width=width, height=height) as image:
+                image.sequence.pop()
+                for index, thumbnail_image in enumerate(thumbnail_images):
+                    thumbnail_image_stream = BytesIO()
+                    thumbnail_image.save(thumbnail_image_stream, format='PNG')
+                    thumbnail_image_stream.seek(0)
+
+                    image.sequence.append(WandImage(blob=thumbnail_image_stream))
+
+                for index, single_image in enumerate(image.sequence):
+                    print index
+                    with single_image:
+                        single_image.delay = original_gif.sequence[index].delay
+
+                image.format = 'GIF'
+                image.save(file=animated_gif_stream)
+
+            animated_gif_stream.seek(0)
+            data = animated_gif_stream.read()
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
