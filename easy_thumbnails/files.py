@@ -398,24 +398,25 @@ class Thumbnailer(File):
         is_animated_gif = self.name.lower().endswith('.gif') \
             and source_image.format == 'GIF' \
             and source_image.info.get('duration') != None
+
+        from wand.image import Image as WandImage
+        from wand.sequence import SingleImage as WandSingleImage
+        from io import BytesIO
+
         if is_animated_gif:
-            frame_index = 0
             images = []
-            durations = []
-            base_image = source_image.convert("RGBA")
-            palette = source_image.getpalette()
-            while True:
-                try:
-                    source_image.seek(frame_index)
-                    if palette == source_image.getpalette():
-                        source_image.putpalette(palette)
-                    rgba_gif_image = source_image.convert("RGBA")
-                    base_image.paste(rgba_gif_image, (0,0), rgba_gif_image)
-                    durations.append(source_image.info['duration'] / 1000.0)
-                    images.append(base_image.copy())
-                except:
-                    break
-                frame_index += 1
+            wand_image = WandImage(filename=self.file.name)
+
+            for frame in wand_image.sequence:
+                self.file.seek(0)
+                image_stream = BytesIO()
+
+                with WandImage(image=frame) as frame_image:
+                    frame_image.format = 'PNG'
+                    frame_image.save(image_stream)
+                    image_stream.seek(0)
+                    images.append(Image.open(image_stream))
+
         else:
             images = [engine.generate_source_image(
             self, thumbnail_options, self.source_generators,
@@ -443,36 +444,27 @@ class Thumbnailer(File):
         quality = thumbnail_options['quality']
         subsampling = thumbnail_options['subsampling']
 
+
         if is_animated_gif:
-            width, height = thumbnail_images[0].size
+            from tempfile import NamedTemporaryFile
+            import subprocess
+            temp_files = []
+            for index, thumbnail_image in enumerate(thumbnail_images):
+                temp_file = NamedTemporaryFile('w', suffix='.png')
+                thumbnail_image.save(temp_file, format='PNG')
+                temp_file.seek(0)
+                temp_files.append(temp_file)
 
-            from wand.image import Image as WandImage
-            from wand.sequence import SingleImage as WandSingleImage
+            output_temp_file = NamedTemporaryFile('rw', suffix='.gif')
+            command = ["convert", "-delay", str(wand_image.sequence[0].delay), "-dispose", "3", "-loop", "0", "-alpha", "set"]
+            for temp_file in temp_files:
+                command.append(temp_file.name)
 
-            import pdb
-            self.file.seek(0)
-            original_gif = WandImage(file=self.file)
+            command.append(output_temp_file.name)
 
-            from io import BytesIO
-            animated_gif_stream = BytesIO()
-            with WandImage(width=width, height=height) as image:
-                image.sequence.pop()
-                for index, thumbnail_image in enumerate(thumbnail_images):
-                    thumbnail_image_stream = BytesIO()
-                    thumbnail_image.save(thumbnail_image_stream, format='PNG')
-                    thumbnail_image_stream.seek(0)
-
-                    image.sequence.append(WandImage(blob=thumbnail_image_stream))
-
-                for index, single_image in enumerate(image.sequence):
-                    with single_image:
-                        single_image.delay = original_gif.sequence[index].delay
-
-                image.format = 'GIF'
-                image.save(file=animated_gif_stream)
-
-            animated_gif_stream.seek(0)
-            data = animated_gif_stream.read()
+            subprocess.call(command)
+            output_temp_file.seek(0)
+            data = output_temp_file.read()
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
