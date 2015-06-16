@@ -450,12 +450,12 @@ class Thumbnailer(File):
             import subprocess
             temp_files = []
             for index, thumbnail_image in enumerate(thumbnail_images):
-                temp_file = NamedTemporaryFile('w', suffix='.png')
+                temp_file = NamedTemporaryFile('w', suffix='.png', delete=True)
                 thumbnail_image.save(temp_file, format='PNG')
                 temp_file.seek(0)
                 temp_files.append(temp_file)
 
-            output_temp_file = NamedTemporaryFile('rw', suffix='.gif')
+            output_temp_file = NamedTemporaryFile('rw', suffix='.gif', delete=True)
             command = ["convert", "-delay", str(wand_image.sequence[0].delay), "-dispose", "3", "-loop", "0", "-alpha", "set"]
             for temp_file in temp_files:
                 command.append(temp_file.name)
@@ -465,6 +465,9 @@ class Thumbnailer(File):
             subprocess.call(command)
             output_temp_file.seek(0)
             data = output_temp_file.read()
+            for temp_file in temp_files:
+                temp_file.close()
+            output_temp_file.close()
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
