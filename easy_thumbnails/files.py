@@ -410,15 +410,11 @@ class Thumbnailer(File):
             durations = []
             base_image = source_image.convert("RGBA")
             palette = source_image.getpalette()
-            while True:
+            from easy_thumbnails.utils import images2gif
+            images = images2gif.readGif(self.file, asNumpy=False)
+            for image in images:
                 try:
-                    source_image.seek(frame_index)
-                    if palette == source_image.getpalette():
-                        source_image.putpalette(palette)
-                    rgba_gif_image = source_image.convert("RGBA")
-                    base_image.paste(rgba_gif_image, (0,0), rgba_gif_image)
-                    durations.append(source_image.info['duration'] / 1000.0)
-                    images.append(base_image.copy())
+                    image.putpalette(palette)
                 except:
                     break
                 frame_index += 1
