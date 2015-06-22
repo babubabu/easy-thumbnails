@@ -460,19 +460,21 @@ class Thumbnailer(File):
                 temp_file.seek(0)
                 temp_files.append(temp_file)
 
-            output_temp_file = NamedTemporaryFile('rw', suffix='.gif', delete=True)
-            command = ["convert", "-delay", str(wand_image.sequence[0].delay), "-dispose", "3", "-loop", "0", "-alpha", "set"]
-            for temp_file in temp_files:
-                command.append(temp_file.name)
+            try:
+                output_temp_file = NamedTemporaryFile('rw', suffix='.gif', delete=True)
+                command = ["convert", "-delay", str(wand_image.sequence[0].delay), "-dispose", "3", "-loop", "0", "-alpha", "set"]
+                for temp_file in temp_files:
+                    command.append(temp_file.name)
 
-            command.append(output_temp_file.name)
+                command.append(output_temp_file.name)
 
-            subprocess.call(command)
-            output_temp_file.seek(0)
-            data = output_temp_file.read()
-            for temp_file in temp_files:
-                temp_file.close()
-            output_temp_file.close()
+                subprocess.call(command)
+                output_temp_file.seek(0)
+                data = output_temp_file.read()
+            finally:
+                for temp_file in temp_files:
+                    temp_file.close()
+                output_temp_file.close()
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
