@@ -406,24 +406,17 @@ class Thumbnailer(File):
         if is_animated_gif:
             wand_image = WandImage(filename=self.file.name)
             frame_index = 0
-            images = []
-            durations = []
-            base_image = source_image.convert("RGBA")
             palette = source_image.getpalette()
             from easy_thumbnails.utils import images2gif
             images = images2gif.readGif(self.file, asNumpy=False)
-            for image in images:
-                try:
-                    image.putpalette(palette)
-                except:
-                    break
-                frame_index += 1
+
         else:
             images = [engine.generate_source_image(
             self, thumbnail_options, self.source_generators,
             fail_silently=silent_template_exception)]
 
         thumbnail_images = []
+
         for image in images:
             if image is None:
                 raise exceptions.InvalidImageFormatError(
@@ -458,14 +451,11 @@ class Thumbnailer(File):
 
             try:
                 output_temp_file = NamedTemporaryFile('rw', suffix='.gif', delete=True)
-                command = ["convert", "-delay", str(wand_image.sequence[0].delay), "-dispose", "3", "-loop", "0", "-alpha", "set"]
-                for temp_file in temp_files:
-                    command.append(temp_file.name)
 
-                command.append(output_temp_file.name)
+                durations = [ single_image.delay / 100.0 for single_image in wand_image.sequence ]
 
-                subprocess.call(command)
-                output_temp_file.seek(0)
+                images2gif.writeGif(output_temp_file.name, thumbnail_images, duration=durations)
+                output_temp_file = open(output_temp_file.name)
                 data = output_temp_file.read()
             finally:
                 for temp_file in temp_files:

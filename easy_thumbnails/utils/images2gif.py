@@ -411,11 +411,10 @@ class GifWriter:
         Given a set of images writes the bytes to the specified stream.
         
         """
-        
         # Obtain palette for all images and count each occurance
         palettes, occur = [], []
         for im in images:
-            palettes.append( getheader(im)[1] )
+            palettes.append(im.palette.getdata()[1])
         for palette in palettes:
             occur.append( palettes.count( palette ) )
         
@@ -425,7 +424,6 @@ class GifWriter:
         # Init
         frames = 0
         firstFrame = True
-        
         
         for im, palette in zip(images, palettes):
         
@@ -438,7 +436,9 @@ class GifWriter:
         
                 # Write
                 fp.write(header)
-                fp.write(globalPalette)
+                if globalPalette is not None:
+                    fp.write(globalPalette)
+
                 fp.write(appext)
         
                 # Next frame is not the first
@@ -460,7 +460,10 @@ class GifWriter:
                     # Use local color palette
                     fp.write(graphext)
                     fp.write(lid) # write suitable image descriptor
-                    fp.write(palette) # write local color table
+
+                    if palette is not None:
+                        fp.write(palette) # write local color table
+
                     fp.write('\x08') # LZW minimum size code
                 else:
                     # Use global color palette
@@ -525,7 +528,7 @@ def writeGif(destination, images, duration=0.1, repeat=True, dither=False,
         If subRectangles==False, the default is 2, otherwise it is 1.
     
     """
-    
+
     # Check PIL
     if PIL is None:
         raise RuntimeError("Need PIL to write animated gif files.")
