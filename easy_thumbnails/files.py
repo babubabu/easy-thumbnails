@@ -441,16 +441,8 @@ class Thumbnailer(File):
 
         if is_animated_gif:
             from tempfile import NamedTemporaryFile
-            import subprocess
-            temp_files = []
-            for index, thumbnail_image in enumerate(thumbnail_images):
-                temp_file = NamedTemporaryFile('w', suffix='.png', delete=True)
-                thumbnail_image.save(temp_file, format='PNG')
-                temp_file.seek(0)
-                temp_files.append(temp_file)
-
             try:
-                output_temp_file = NamedTemporaryFile('rw', suffix='.gif', delete=True)
+                output_temp_file = NamedTemporaryFile('rw', suffix='.gif')
 
                 durations = [ single_image.delay / 100.0 for single_image in wand_image.sequence ]
 
@@ -458,9 +450,8 @@ class Thumbnailer(File):
                 output_temp_file = open(output_temp_file.name)
                 data = output_temp_file.read()
             finally:
-                for temp_file in temp_files:
-                    temp_file.close()
                 output_temp_file.close()
+                #os.remove(output_temp_file.name)
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
