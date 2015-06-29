@@ -399,17 +399,15 @@ class Thumbnailer(File):
             and source_image.format == 'GIF' \
             and source_image.info.get('duration') != None
 
-        from wand.image import Image as WandImage
-        from wand.sequence import SingleImage as WandSingleImage
         from io import BytesIO
 
         if is_animated_gif:
-            wand_image = WandImage(filename=self.file.name)
             frame_index = 0
             palette = source_image.getpalette()
             from easy_thumbnails.utils import images2gif
             images = images2gif.readGif(self.file, asNumpy=False)
-
+            # convert the durations to 0.1 secs
+            durations = [single_duration / 1000.0 for single_duration in images2gif.getDurationsOfGif(self.file)]
         else:
             images = [engine.generate_source_image(
             self, thumbnail_options, self.source_generators,
@@ -444,15 +442,12 @@ class Thumbnailer(File):
             try:
                 output_temp_file = NamedTemporaryFile('rw', suffix='.gif')
 
-                durations = [ single_image.delay / 100.0 for single_image in wand_image.sequence ]
-
                 images2gif.writeGif(output_temp_file.name, thumbnail_images, duration=durations)
                 output_temp_file = open(output_temp_file.name)
                 data = output_temp_file.read()
             finally:
                 output_temp_file.close()
-                os.remove(output_temp_file.name)
-                wand_image.destory()
+                del output_temp_file
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
@@ -461,7 +456,6 @@ class Thumbnailer(File):
         thumbnail = ThumbnailFile(
             filename, file=ContentFile(data), storage=self.thumbnail_storage,
             thumbnail_options=thumbnail_options)
-        thumbnail.image = thumbnail_image
         thumbnail._committed = False
 
         return thumbnail
