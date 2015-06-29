@@ -451,7 +451,8 @@ class Thumbnailer(File):
                 data = output_temp_file.read()
             finally:
                 output_temp_file.close()
-                #os.remove(output_temp_file.name)
+                os.remove(output_temp_file.name)
+                wand_image.destory()
         else:
             img = engine.save_image(
                 thumbnail_image, filename=filename, quality=quality)
