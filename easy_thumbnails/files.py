@@ -386,6 +386,7 @@ class Thumbnailer(File):
 
         if high_resolution:
             thumbnail_options['size'] = (orig_size[0] * 2, orig_size[1] * 2)
+
         image = engine.generate_source_image(
             self, thumbnail_options, self.source_generators,
             fail_silently=silent_template_exception)
@@ -415,6 +416,9 @@ class Thumbnailer(File):
 
         thumbnail_images = []
 
+        if high_resolution:
+            thumbnail_options['high_resolution'] = True
+
         for image in images:
             if image is None:
                 raise exceptions.InvalidImageFormatError(
@@ -428,6 +432,7 @@ class Thumbnailer(File):
 
         if high_resolution:
             thumbnail_options['size'] = orig_size  # restore original size
+            del thumbnail_options['high_resolution']
 
         filename = self.get_thumbnail_name(
             thumbnail_options,
@@ -435,7 +440,6 @@ class Thumbnailer(File):
             high_resolution=high_resolution)
         quality = thumbnail_options['quality']
         subsampling = thumbnail_options['subsampling']
-
 
         if is_animated_gif:
             from tempfile import NamedTemporaryFile
